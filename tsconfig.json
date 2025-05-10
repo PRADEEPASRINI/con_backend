@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": "src",  // Set baseUrl to 'src'
+    "paths": {
+      "@/*": ["*"] // Match alias to point directly to the src folder
+    },
+    "noImplicitAny": false,
+    "noUnusedParameters": false,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noUnusedLocals": false,
+    "strictNullChecks": false
+  }
+}
