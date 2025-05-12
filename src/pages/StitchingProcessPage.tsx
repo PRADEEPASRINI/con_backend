@@ -9,6 +9,23 @@ const trackAnalytics = (event: string, data: object) => {
   console.log(`Analytics Event: ${event}`, data);
 };
 
+// Add the missing formatDateForInput function
+const formatDateForInput = (dateString: string | undefined) => {
+  if (!dateString) return "";
+  
+  try {
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) return "";
+    
+    // Format as YYYY-MM-DD for input[type="date"]
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "";
+  }
+};
+
 const StitchingProcess = () => {
   const { items, loading, updateItem, fetchItemsByCustomerId } = useData();
   const [searchId, setSearchId] = useState("");
@@ -91,7 +108,10 @@ const StitchingProcess = () => {
     }
   };
 
-  const filteredItems = items.filter(item => item.cuttingStatus === "Done");
+  // Safely filter items - check if items exists and is an array before filtering
+  const filteredItems = items && Array.isArray(items) 
+    ? items.filter(item => item.cuttingStatus === "Done") 
+    : [];
 
   const columns: Column<ProductItem>[] = [
     { header: "Item Name", accessor: "itemName" },
@@ -165,7 +185,7 @@ const StitchingProcess = () => {
             <input
               type="date"
               name="date"
-              value={editForm.date || item.date}
+              value={editForm.date || formatDateForInput(item.date)}
               onChange={handleInputChange}
               className="w-full rounded-md border border-textile-300 px-2 py-1 text-sm text-black"
             />
@@ -256,7 +276,7 @@ const StitchingProcess = () => {
         />
       </div>
 
-      {selectedCustomerId && (
+      {selectedCustomerId && filteredItems.length > 0 && (
         <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="rounded-md bg-white p-4 shadow-md text-gray-800"> {/* Added text color */}
             <h3 className="mb-2 text-lg font-medium text-textile-800">Tailor Assignments</h3>
