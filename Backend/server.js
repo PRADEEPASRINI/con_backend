@@ -12,7 +12,11 @@ const mongoose = require('mongoose');
 const app = express();
 
 // Middleware
-app.use(cors());
+const allowedOrigin = 'http://192.168.153.1:8080';
+
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true }));
 app.use(express.json());
 
 // Health check endpoint

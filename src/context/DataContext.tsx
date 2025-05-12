@@ -44,7 +44,7 @@ const DataContext = createContext<DataContextType>({
 export const useData = () => useContext(DataContext);
 
 // Base API URL - configure this based on your environment
-const API_BASE_URL = "http://localhost:27017";
+const API_BASE_URL ="http://localhost:5000";
 
 interface DataProviderProps {
   children: ReactNode;
@@ -61,8 +61,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     const fetchCustomers = async () => {
       try {
         // Modified to use the correct endpoint
-        const response = await axios.get(`${API_BASE_URL}/teamProduction/customers`);
-        setCustomers(response.data);
+        const response = await axios.get(`${API_BASE_URL}/api/orders/customer?customerId=${customerId}`)
+
+        setCustomers(response.data.value);
       } catch (err) {
         console.error("Error fetching customers:", err);
         // Since this is not critical, we'll just log the error
@@ -81,10 +82,10 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       // MAJOR FIX: Update these endpoints to match your actual database structure
       // Fetch data from all relevant collections
       const [ordersResponse, cuttingResponse, stitchingResponse, qualityResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/teamProduction/orders?customerId=${customerId}`),
-        axios.get(`${API_BASE_URL}/teamProduction/cuttingstatuses?customerId=${customerId}`),
-        axios.get(`${API_BASE_URL}/teamProduction/stitchingstatuses?customerId=${customerId}`),
-        axios.get(`${API_BASE_URL}/teamProduction/qualitystatuses?customerId=${customerId}`)
+        axios.get(`${API_BASE_URL}/api/orders/customer/${customerId}`),
+        axios.get(`${API_BASE_URL}/api/cutting/cutting/customer/${customerId}`),
+        axios.get(`${API_BASE_URL}/api/stiching/stitching/customer/$customerId}`),
+        axios.get(`${API_BASE_URL}/api/quality/customer?customerId=${customerId}`)
       ]);
 
       // Process order data as the base
