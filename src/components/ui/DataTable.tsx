@@ -9,7 +9,7 @@ export interface Column<T> {
 
 interface DataTableProps<T> {
   columns: Column<T>[];
-  data: T[];
+  data?: T[]; // Updated to allow `undefined` or `null` for safety
   keyExtractor: (item: T) => string | number;
   onRowClick?: (item: T) => void;
   isLoading?: boolean;
@@ -17,7 +17,7 @@ interface DataTableProps<T> {
 
 function DataTable<T>({
   columns,
-  data,
+  data = [], // Default to an empty array if `data` is `undefined`
   keyExtractor,
   onRowClick,
   isLoading = false,

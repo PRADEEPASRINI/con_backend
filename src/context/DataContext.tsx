@@ -15,16 +15,13 @@ export interface ProductItem {
   totalWeight: number;
   quantity: number;
   date: string;
-  cuttingStatus?: {
-    status: "Not Started" | "In Progress" | "Done";
-    supervisor?: string;
-    date?: string;
-  };
-  stitchingStatus?: {
-    status: "Not Started" | "In Progress" | "Done";
-    tailor?: string;
-    date?: string;
-  };
+  cuttingStatus: "Not Started" | "In Progress" | "Done";
+  stitchingStatus: "Not Started" | "In Progress" | "Done";
+  supervisor?: string;
+  tailor?: string;
+  qualityStatus?: "Pending" | "Passed" | "Rejected";
+  rejectedReason?: string;
+  imageUrl?: string;
 }
 
 export interface ColorGroup {
@@ -54,6 +51,9 @@ interface DataContextType {
   isLoading: boolean;
   error: string | null;
   
+  // Fetch functions - aliased to match what pages are using
+  fetchItemsByCustomerId: (customerId: string) => Promise<void>;
+  
   // Refresh functions
   refreshOrders: () => Promise<void>;
   refreshCuttingStatus: () => Promise<void>;
@@ -61,7 +61,10 @@ interface DataContextType {
   refreshQualityStatus: () => Promise<void>;
   refreshAllData: () => Promise<void>;
   
-  // Update functions
+  // Update functions - mapped to match what your components are using
+  updateItem: (item: ProductItem) => Promise<void>;
+  
+  // Original update functions
   updateCuttingStatus: (
     orderId: string, 
     data: cuttingService.CuttingUpdate
@@ -104,6 +107,12 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch items by customer ID - maps to what components expect
+  const fetchItemsByCustomerId = async (customerId: string): Promise<void> => {
+    setCurrentCustomerId(customerId);
+    await refreshAllData();
+  };
 
   // Fetch orders for current customer
   const refreshOrders = async (): Promise<void> => {
@@ -195,6 +204,51 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
   };
 
+  // Generic update item function that maps to what components expect
+  const updateItem = async (item: ProductItem): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Determine what type of update to perform based on item properties
+      if (item.cuttingStatus) {
+        await updateCuttingStatus(item.id, {
+          status: item.cuttingStatus,
+          supervisor: item.supervisor,
+          date: item.date
+        });
+      }
+      
+      if (item.stitchingStatus) {
+        await updateStitchingStatus(item.id, {
+          status: item.stitchingStatus,
+          tailor: item.tailor,
+          date: item.date
+        });
+      }
+      
+      if (item.qualityStatus && item.color) {
+        await updateQualityStatus(
+          item.customerId,
+          item.color,
+          {
+            qualityStatus: item.qualityStatus,
+            rejectedReason: item.rejectedReason,
+            supervisor: item.supervisor,
+            date: item.date,
+            clothType: item.clothType
+          }
+        );
+      }
+      
+      await refreshAllData();
+    } catch (err) {
+      setError("Failed to update item");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Update cutting status
   const updateCuttingStatus = async (
     orderId: string, 
@@ -264,11 +318,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     qualityGroups,
     isLoading,
     error,
+    fetchItemsByCustomerId, // Added to match what components expect
     refreshOrders,
     refreshCuttingStatus,
     refreshStitchingStatus,
     refreshQualityStatus,
     refreshAllData,
+    updateItem, // Added to match what components expect
     updateCuttingStatus,
     updateStitchingStatus,
     updateQualityStatus
