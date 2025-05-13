@@ -44,7 +44,7 @@ const DataContext = createContext<DataContextType>({
 export const useData = () => useContext(DataContext);
 
 // Base API URL - configure this based on your environment
-const API_BASE_URL ="http://localhost:5000";
+const API_BASE_URL = "http://localhost:5000";
 
 interface DataProviderProps {
   children: ReactNode;
@@ -60,10 +60,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        // Modified to use the correct endpoint
-        const response = await axios.get(`${API_BASE_URL}/api/orders/customer?customerId=${customerId}`)
-
-        setCustomers(response.data.value);
+        // FIX: Remove reference to undefined customerId variable
+        const response = await axios.get(`${API_BASE_URL}/api/orders/customers`);
+        setCustomers(response.data || []);
       } catch (err) {
         console.error("Error fetching customers:", err);
         // Since this is not critical, we'll just log the error
@@ -79,13 +78,12 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setError(null);
     
     try {
-      // MAJOR FIX: Update these endpoints to match your actual database structure
-      // Fetch data from all relevant collections
+      // FIX: Update endpoints to match your actual API structure in server.js
       const [ordersResponse, cuttingResponse, stitchingResponse, qualityResponse] = await Promise.all([
         axios.get(`${API_BASE_URL}/api/orders/customer/${customerId}`),
-        axios.get(`${API_BASE_URL}/api/cutting/cutting/customer/${customerId}`),
-        axios.get(`${API_BASE_URL}/api/stiching/stitching/customer/$customerId}`),
-        axios.get(`${API_BASE_URL}/api/quality/customer?customerId=${customerId}`)
+        axios.get(`${API_BASE_URL}/api/cutting/customer/${customerId}`),
+        axios.get(`${API_BASE_URL}/api/stitching/customer/${customerId}`),
+        axios.get(`${API_BASE_URL}/api/quality/customer/${customerId}`)
       ]);
 
       // Process order data as the base
@@ -143,9 +141,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   // Update an item
   const updateItem = async (updatedItem: ProductItem) => {
     try {
-      // Determine which endpoint to update based on the changed fields
+      // FIX: Update API endpoints to match your backend routes
       if (updatedItem.cuttingStatus) {
-        await axios.put(`${API_BASE_URL}/teamProduction/cuttingstatuses/${updatedItem.id}`, {
+        await axios.put(`${API_BASE_URL}/api/cutting/${updatedItem.id}`, {
           status: updatedItem.cuttingStatus,
           supervisor: updatedItem.supervisor,
           date: updatedItem.date,
@@ -153,7 +151,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       }
 
       if (updatedItem.stitchingStatus) {
-        await axios.put(`${API_BASE_URL}/teamProduction/stitchingstatuses/${updatedItem.id}`, {
+        await axios.put(`${API_BASE_URL}/api/stitching/${updatedItem.id}`, {
           status: updatedItem.stitchingStatus,
           tailor: updatedItem.tailor,
           date: updatedItem.date,
@@ -161,7 +159,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       }
 
       if (updatedItem.qualityStatus) {
-        await axios.put(`${API_BASE_URL}/teamProduction/qualitystatuses/${updatedItem.id}`, {
+        await axios.put(`${API_BASE_URL}/api/quality/${updatedItem.customerId}/${updatedItem.color}`, {
           qualityStatus: updatedItem.qualityStatus,
           rejectedReason: updatedItem.rejectedReason,
           supervisor: updatedItem.supervisor,
