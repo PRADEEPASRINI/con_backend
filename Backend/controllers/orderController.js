@@ -75,3 +75,19 @@ exports.getOrdersByCustomerId = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Add this new method for getting all unique customers
+exports.getAllCustomers = async (req, res) => {
+  try {
+    // Using MongoDB's distinct method to get unique customer IDs
+    const customers = await Order.distinct('customerId');
+    
+    // Format the response to match what the frontend expects
+    const formattedCustomers = customers.map(customerId => ({ customerId }));
+    
+    res.status(200).json(formattedCustomers);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

@@ -8,4 +8,7 @@ router.post('/', orderController.createOrder);
 // Get orders by customer ID
 router.get('/customer/:customerId', orderController.getOrdersByCustomerId);
 
+// Get all unique customers
+router.get('/customers', orderController.getAllCustomers);
+
 module.exports = router;
