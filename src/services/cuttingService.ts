@@ -19,6 +19,7 @@ export const getCuttingStatusByCustomerId = async (customerId: string): Promise<
 
 export const updateCuttingStatus = async (orderId: string, data: CuttingUpdate) => {
   try {
+    // Make sure we're hitting exactly the endpoint defined in cuttingRoutes.js
     const response = await api.put(`/cutting/${orderId}`, data);
     return response.data;
   } catch (error) {

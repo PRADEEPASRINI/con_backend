@@ -4,6 +4,7 @@ import DataTable, { Column } from "@/components/ui/DataTable";
 import FileUpload from "@/components/ui/FileUpload";
 import { Check, Save } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import BlueQualityCheck from "@/components/BlueQualityCheck";
 
 interface ColorGroup {
   color: string;
@@ -21,7 +22,6 @@ const QualityControl = () => {
   const [uniqueColorGroups, setUniqueColorGroups] = useState<ColorGroup[]>([]);
   const { toast } = useToast();
 
-  // ✅ Group items by unique colors safely
   useEffect(() => {
     if (!Array.isArray(items)) return;
 
@@ -83,12 +83,13 @@ const QualityControl = () => {
       const itemsToUpdate = items.filter(item => item.color === colorToUpdate);
 
       itemsToUpdate.forEach(item => {
-        const updatedItem = {
+        const updatedItem: ProductItem = {
           ...item,
-          qualityStatus: formData.qualityStatus,
+          qualityStatus: formData.qualityStatus!,
           rejectedReason: formData.rejectedReason,
-          supervisor: formData.supervisor,
+          supervisor: formData.supervisor!,
           imageUrl: formData.imageUrl,
+          date: item.date ?? new Date().toISOString().split("T")[0], // Preserve or assign date
         };
         updateItem(updatedItem);
       });

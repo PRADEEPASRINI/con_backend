@@ -11,6 +11,7 @@ import StitchingProcessPage from "./pages/StitchingProcessPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import NotFound from "./pages/NotFound";
 import Navbar from "@/components/layout/Navbar";
+import BlueQualityCheck from "@/components/BlueQualityCheck";
 
 // Layout wrapper to apply global background and shared UI (like sidebar)
 const Layout = ({ children }: { children: React.ReactNode }) => {

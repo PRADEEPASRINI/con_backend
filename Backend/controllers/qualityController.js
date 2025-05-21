@@ -54,6 +54,7 @@ exports.getQualityStatusByCustomerId = async (req, res) => {
     
     res.json(results);
   } catch (error) {
+    console.error("Error in getQualityStatusByCustomerId:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -61,10 +62,13 @@ exports.getQualityStatusByCustomerId = async (req, res) => {
 exports.updateQualityStatus = async (req, res) => {
   try {
     const { customerId, color } = req.params;
-    const { qualityStatus, dyeingStatus, rejectedReason, supervisor, date } = req.body;
+    const { qualityStatus, dyeingStatus, rejectedReason, supervisor, date, clothType } = req.body;
+    
+    console.log("Updating quality status for customer:", customerId, "color:", color);
+    console.log("Request body:", req.body);
     
     // Get photo URL if uploaded
-    const photoUrl = req.file?.path;
+    const photoUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
     
     // Find existing quality status or create new one
     let qualityStatusDoc = await QualityStatus.findOne({ customerId, color });
@@ -74,25 +78,32 @@ exports.updateQualityStatus = async (req, res) => {
       qualityStatusDoc = new QualityStatus({
         customerId,
         color,
-        clothType: req.body.clothType
+        clothType: clothType || ''
       });
+      console.log("Creating new quality status document");
+    } else {
+      console.log("Found existing quality status document:", qualityStatusDoc._id);
     }
     
     // Update fields
-    if (qualityStatus) qualityStatusDoc.qualityStatus = qualityStatus;
-    if (dyeingStatus) qualityStatusDoc.dyeingStatus = dyeingStatus;
-    if (rejectedReason) qualityStatusDoc.rejectedReason = rejectedReason;
-    if (supervisor) qualityStatusDoc.supervisor = supervisor;
-    if (photoUrl) qualityStatusDoc.photoUrl = photoUrl;
+    if (qualityStatus !== undefined) qualityStatusDoc.qualityStatus = qualityStatus;
+    if (dyeingStatus !== undefined) qualityStatusDoc.dyeingStatus = dyeingStatus;
+    if (rejectedReason !== undefined) qualityStatusDoc.rejectedReason = rejectedReason;
+    if (supervisor !== undefined) qualityStatusDoc.supervisor = supervisor;
+    if (photoUrl !== undefined) qualityStatusDoc.photoUrl = photoUrl;
     
     if (date) {
       qualityStatusDoc.date = new Date(date);
+    } else {
+      qualityStatusDoc.date = new Date();
     }
     
+    console.log("Saving quality status:", qualityStatusDoc);
     const updatedStatus = await qualityStatusDoc.save();
     
     res.json(updatedStatus);
   } catch (error) {
+    console.error("Error in updateQualityStatus:", error);
     res.status(500).json({ message: error.message });
   }
 };
