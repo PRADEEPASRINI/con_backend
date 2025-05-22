@@ -51,6 +51,7 @@ exports.getStitchingStatusByCustomerId = async (req, res) => {
     
     res.json(results);
   } catch (error) {
+    console.error('Error in getStitchingStatusByCustomerId:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -60,7 +61,16 @@ exports.updateStitchingStatus = async (req, res) => {
     const { orderId } = req.params;
     const { status, tailor, date } = req.body;
     
-    // First verify the cutting is complete
+    console.log('Updating stitching status for orderId:', orderId);
+    console.log('Update data:', { status, tailor, date });
+    
+    // First get the order to get customer ID
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    
+    // Verify the cutting is complete
     const cuttingStatus = await CuttingStatus.findOne({ orderId });
     if (!cuttingStatus || cuttingStatus.status !== 'Done') {
       return res.status(400).json({ 
@@ -68,23 +78,36 @@ exports.updateStitchingStatus = async (req, res) => {
       });
     }
     
+    // Find existing stitching status or create new one
     let stitchingStatus = await StitchingStatus.findOne({ orderId });
     
     if (!stitchingStatus) {
-      return res.status(404).json({ message: 'Stitching status not found' });
-    }
-    
-    stitchingStatus.status = status || stitchingStatus.status;
-    stitchingStatus.tailor = tailor || stitchingStatus.tailor;
-    
-    if (date) {
-      stitchingStatus.date = new Date(date);
+      // Create new stitching status record
+      console.log('Creating new stitching status record');
+      stitchingStatus = new StitchingStatus({
+        orderId: orderId,
+        customerId: order.customerId,
+        status: status || 'Not Started',
+        tailor: tailor || '',
+        date: date ? new Date(date) : new Date()
+      });
+    } else {
+      // Update existing record
+      console.log('Updating existing stitching status record');
+      stitchingStatus.status = status || stitchingStatus.status;
+      stitchingStatus.tailor = tailor || stitchingStatus.tailor;
+      
+      if (date) {
+        stitchingStatus.date = new Date(date);
+      }
     }
     
     const updatedStatus = await stitchingStatus.save();
+    console.log('Stitching status saved successfully:', updatedStatus);
     
     res.json(updatedStatus);
   } catch (error) {
+    console.error('Error in updateStitchingStatus:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -143,15 +143,22 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       const processedItems = ordersData.map((order: any) => {
         console.log("Processing order:", order);
         
-        // Find matching cutting data
-        const cuttingItem = cuttingData.find((item: any) => 
-          item.orderId === order._id?.toString() || item.orderId === order._id
-        ) || {};
+        // Convert order ID to string for consistent comparison
+        const orderIdString = order._id?.toString() || order.id?.toString() || "";
         
-        // Find matching stitching data
-        const stitchingItem = stitchingData.find((item: any) => 
-          item.orderId === order._id?.toString() || item.orderId === order._id
-        ) || {};
+        // Find matching cutting data
+        const cuttingItem = cuttingData.find((item: any) => {
+          const itemOrderId = item.orderId?.toString() || "";
+          return itemOrderId === orderIdString;
+        }) || {};
+        
+        // Find matching stitching data - IMPROVED MATCHING LOGIC
+        const stitchingItem = stitchingData.find((item: any) => {
+          const itemOrderId = item.orderId?.toString() || "";
+          return itemOrderId === orderIdString;
+        }) || {};
+        
+        console.log("Found stitching item for order", orderIdString, ":", stitchingItem);
         
         // Find matching quality data based on color
         const qualityItem = qualityData.find((item: any) => 
@@ -160,7 +167,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         
         // Combine all data into a single item
         const processedItem = {
-          id: order._id?.toString() || order.id || "",
+          id: orderIdString,
           customerId: order.customerId || "",
           itemName: order.itemName || "",
           size: order.size || "",
@@ -171,10 +178,11 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           stitchingStatus: stitchingItem.status || order.stitchingStatus || "Not Started",
           qualityStatus: qualityItem.qualityStatus || qualityItem.status || "Not Started",
           supervisor: cuttingItem.supervisor || qualityItem.supervisor || "",
-          tailor: stitchingItem.tailor || "",
+          tailor: stitchingItem.tailor || "", // This should now work correctly
           rejectedReason: qualityItem.rejectedReason || "",
           imageUrl: qualityItem.photoUrl || qualityItem.imageUrl || "",
-          date: order.date || qualityItem.date || new Date().toISOString().split('T')[0],
+          // IMPROVED DATE HANDLING - prioritize stitching date when available
+          date: stitchingItem.date || cuttingItem.date || order.date || qualityItem.date || new Date().toISOString().split('T')[0],
         };
         
         console.log("Processed item:", processedItem);
@@ -222,20 +230,25 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         }
       }
       
-      // For stitching status updates
+      // For stitching status updates - IMPROVED STITCHING UPDATE
       if (updatedItem.stitchingStatus && updatedItem.stitchingStatus !== "Not Started") {
         try {
-          const response = await axios.put(`${API_BASE_URL}/stitching/${updatedItem.id}`, {
+          const stitchingUpdateData = {
             status: updatedItem.stitchingStatus,
-            tailor: updatedItem.tailor
-          });
+            tailor: updatedItem.tailor,
+            date: updatedItem.date || new Date().toISOString().split('T')[0]
+          };
+          
+          console.log("Sending stitching update data:", stitchingUpdateData);
+          
+          const response = await axios.put(`${API_BASE_URL}/stitching/${updatedItem.id}`, stitchingUpdateData);
           console.log("Stitching update response:", response.data);
         } catch (err) {
           console.error("Error updating stitching status:", err);
         }
       }
       
-      // For quality updates
+      // For quality updates (UNCHANGED)
       if (updatedItem.qualityStatus && updatedItem.qualityStatus !== "Not Started") {
         try {
           // Create form data for file uploads if needed

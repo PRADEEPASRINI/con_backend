@@ -5,14 +5,22 @@ exports.getQualityStatusByCustomerId = async (req, res) => {
   try {
     const customerId = req.params.customerId;
     
-    // Get quality statuses
-    const qualityStatuses = await QualityStatus.find({ customerId });
+    // Get all quality statuses if no customerId provided
+    const qualityStatuses = customerId 
+      ? await QualityStatus.find({ customerId })
+      : await QualityStatus.find();
     
-    // Get orders to understand all available colors
-    const orders = await Order.find({ customerId });
+    // Get all orders if no customerId provided
+    const orders = customerId 
+      ? await Order.find({ customerId })
+      : await Order.find();
     
     if (orders.length === 0) {
-      return res.status(404).json({ message: 'No orders found for this customer' });
+      return res.status(404).json({ 
+        message: customerId 
+          ? 'No orders found for this customer' 
+          : 'No orders found in the system'
+      });
     }
     
     // Group orders by color
@@ -46,9 +54,11 @@ exports.getQualityStatusByCustomerId = async (req, res) => {
         dyeingStatus: qualityStatus?.dyeingStatus || 'Not Started',
         qualityStatus: qualityStatus?.qualityStatus || 'Pending',
         rejectedReason: qualityStatus?.rejectedReason || '',
-        photoUrl: qualityStatus?.photoUrl || '',
+        imageUrl: qualityStatus?.photoUrl || '',
         supervisor: qualityStatus?.supervisor || '',
-        date: qualityStatus?.date ? qualityStatus.date.toISOString().split('T')[0] : null
+        date: qualityStatus?.date 
+          ? qualityStatus.date.toISOString().split('T')[0] 
+          : new Date().toISOString().split('T')[0]
       };
     });
     
@@ -62,10 +72,7 @@ exports.getQualityStatusByCustomerId = async (req, res) => {
 exports.updateQualityStatus = async (req, res) => {
   try {
     const { customerId, color } = req.params;
-    const { qualityStatus, dyeingStatus, rejectedReason, supervisor, date, clothType } = req.body;
-    
-    console.log("Updating quality status for customer:", customerId, "color:", color);
-    console.log("Request body:", req.body);
+    const { qualityStatus, rejectedReason, supervisor, clothType } = req.body;
     
     // Get photo URL if uploaded
     const photoUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
@@ -74,34 +81,28 @@ exports.updateQualityStatus = async (req, res) => {
     let qualityStatusDoc = await QualityStatus.findOne({ customerId, color });
     
     if (!qualityStatusDoc) {
-      // Create new quality status
       qualityStatusDoc = new QualityStatus({
         customerId,
         color,
         clothType: clothType || ''
       });
-      console.log("Creating new quality status document");
-    } else {
-      console.log("Found existing quality status document:", qualityStatusDoc._id);
     }
     
     // Update fields
     if (qualityStatus !== undefined) qualityStatusDoc.qualityStatus = qualityStatus;
-    if (dyeingStatus !== undefined) qualityStatusDoc.dyeingStatus = dyeingStatus;
     if (rejectedReason !== undefined) qualityStatusDoc.rejectedReason = rejectedReason;
     if (supervisor !== undefined) qualityStatusDoc.supervisor = supervisor;
     if (photoUrl !== undefined) qualityStatusDoc.photoUrl = photoUrl;
     
-    if (date) {
-      qualityStatusDoc.date = new Date(date);
-    } else {
-      qualityStatusDoc.date = new Date();
-    }
+    // Always update the date to current date
+    qualityStatusDoc.date = new Date();
     
-    console.log("Saving quality status:", qualityStatusDoc);
     const updatedStatus = await qualityStatusDoc.save();
     
-    res.json(updatedStatus);
+    res.json({
+      ...updatedStatus._doc,
+      date: updatedStatus.date.toISOString().split('T')[0]
+    });
   } catch (error) {
     console.error("Error in updateQualityStatus:", error);
     res.status(500).json({ message: error.message });

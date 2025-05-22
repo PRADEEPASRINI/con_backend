@@ -19,18 +19,32 @@ const trackAnalytics = (event: string, data: object) => {
 
 // Format date for input fields
 const formatDateForInput = (dateString: string | undefined) => {
-  if (!dateString) return "";
+  if (!dateString) return new Date().toISOString().split('T')[0];
   
   try {
     const date = new Date(dateString);
     // Check if date is valid
-    if (isNaN(date.getTime())) return "";
+    if (isNaN(date.getTime())) return new Date().toISOString().split('T')[0];
     
     // Format as YYYY-MM-DD for input[type="date"]
     return date.toISOString().split('T')[0];
   } catch (error) {
     console.error("Error formatting date:", error);
-    return "";
+    return new Date().toISOString().split('T')[0];
+  }
+};
+
+// Format date for display
+const formatDateForDisplay = (dateString: string | undefined) => {
+  if (!dateString) return new Date().toLocaleDateString();
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return new Date().toLocaleDateString();
+    return date.toLocaleDateString();
+  } catch (error) {
+    console.error("Error formatting date for display:", error);
+    return new Date().toLocaleDateString();
   }
 };
 
@@ -86,7 +100,7 @@ const StitchingProcess = () => {
 
     setEditingId(item.id);
     setEditForm({
-      stitchingStatus: item.stitchingStatus,
+      stitchingStatus: item.stitchingStatus || "Not Started",
       tailor: item.tailor || "",
       date: formatDateForInput(item.date),
     });
@@ -108,26 +122,53 @@ const StitchingProcess = () => {
     setSaving(true);
 
     try {
-      const updatedItem = {
-        ...item,
-        ...editForm,
+      console.log('Saving stitching update for item:', item.id);
+      console.log('Form data:', editForm);
+
+      // Validate required fields
+      if (!editForm.tailor) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a tailor before saving.",
+          variant: "destructive",
+        });
+        setSaving(false);
+        return;
+      }
+
+      // Call the backend API directly with proper data structure
+      const updateData = {
+        status: editForm.stitchingStatus || "Not Started",
+        tailor: editForm.tailor,
+        date: editForm.date || new Date().toISOString().split('T')[0]
       };
 
-      // Call the backend API directly
-      await axios.put(`http://localhost:5000/api/stitching/${item.id}`, {
-        status: editForm.stitchingStatus,
-        tailor: editForm.tailor,
-        date: editForm.date
-      });
+      console.log('Sending update data:', updateData);
+
+      const response = await axios.put(
+        `http://localhost:5000/api/stitching/${item.id}`, 
+        updateData,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Update response:', response.data);
+
+      // Add a small delay before refreshing to ensure database consistency
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Refresh the data to see the updated values
       await fetchItemsByCustomerId(item.customerId);
       
       setEditingId(null);
+      setEditForm({});
       
       toast({
         title: "Stitching process updated",
-        description: `${item.itemName} has been updated to ${editForm.stitchingStatus}.`,
+        description: `${item.itemName} has been updated successfully.`,
       });
       
       // Track save event
@@ -138,11 +179,19 @@ const StitchingProcess = () => {
         tailor: editForm.tailor,
         customerId: item.customerId
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating stitching status:", error);
+      
+      let errorMessage = "There was an error updating the stitching status.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Update failed",
-        description: "There was an error updating the stitching status.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -152,6 +201,7 @@ const StitchingProcess = () => {
 
   const handleCancel = () => {
     setEditingId(null);
+    setEditForm({});
   };
 
   const handleRowClick = (item: ProductItem) => {
@@ -180,6 +230,7 @@ const StitchingProcess = () => {
               onChange={handleInputChange}
               className="w-full rounded-md border border-textile-300 px-2 py-1 text-sm text-black"
               autoFocus
+              required
             >
               <option value="">Select Tailor</option>
               <option value="Robert Lee">Robert Lee</option>
@@ -203,7 +254,7 @@ const StitchingProcess = () => {
           return (
             <select
               name="stitchingStatus"
-              value={editForm.stitchingStatus}
+              value={editForm.stitchingStatus || "Not Started"}
               onChange={handleInputChange}
               className="w-full rounded-md border border-textile-300 px-2 py-1 text-sm text-black"
             >
@@ -244,7 +295,7 @@ const StitchingProcess = () => {
             />
           );
         }
-        return item.date;
+        return formatDateForDisplay(item.date);
       }, 
       width: "110px" 
     },
