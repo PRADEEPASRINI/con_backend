@@ -47,12 +47,22 @@ const CuttingManagement = () => {
 
   const handleSave = (item: ProductItem) => {
     setSaving(true);
+    
+    // Create updated item with necessary fields for cutting update
+    const updatedItem = {
+      ...item,
+      ...editForm,
+      cuttingStatus: editForm.cuttingStatus || item.cuttingStatus,  // Ensure we have cuttingStatus
+    };
+    
+    // Log the item being updated for debugging
+    console.log("Updating cutting status for item:", updatedItem);
+    
+    // Call updateItem from context which will use our cuttingService
+    updateItem(updatedItem);
+    
+    // Reset UI state after a brief delay to show the loading indicator
     setTimeout(() => {
-      const updatedItem = {
-        ...item,
-        ...editForm,
-      };
-      updateItem(updatedItem);
       setEditingId(null);
       setSaving(false);
       toast({

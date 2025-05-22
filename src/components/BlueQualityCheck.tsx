@@ -15,6 +15,9 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [inspectionDate, setInspectionDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
   
   // Fetch existing data if we have a customerId
   useEffect(() => {
@@ -34,6 +37,11 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
         setRejectionReason(blueColorData.rejectedReason || "");
         setSupervisor(blueColorData.supervisor || "");
         
+        // Set date if available, otherwise use current date
+        if (blueColorData.date) {
+          setInspectionDate(blueColorData.date.split('T')[0]);
+        }
+        
         if (blueColorData.photoUrl) {
           setPreviewUrl(`http://localhost:5000${blueColorData.photoUrl}`);
         }
@@ -44,13 +52,18 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+    const fileInput = e.target;
+    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+      const file = fileInput.files[0];
       setSelectedFile(file);
       
       // Create preview URL
       const fileUrl = URL.createObjectURL(file);
       setPreviewUrl(fileUrl);
+      
+      console.log("File selected:", file.name);
+    } else {
+      console.log("No file selected");
     }
   };
   
@@ -68,16 +81,27 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
       const formData = new FormData();
       formData.append("clothType", clothType);
       formData.append("qualityStatus", qualityStatus);
+      formData.append("date", inspectionDate);
       
       if (qualityStatus === "Rejected") {
         formData.append("rejectedReason", rejectionReason);
         
         if (selectedFile) {
           formData.append("photo", selectedFile);
+          console.log("Attaching photo:", selectedFile.name);
         }
       }
       
       formData.append("supervisor", supervisor);
+      
+      console.log("Submitting form data:", {
+        clothType,
+        qualityStatus,
+        rejectedReason: qualityStatus === "Rejected" ? rejectionReason : "",
+        supervisor,
+        date: inspectionDate,
+        hasPhoto: !!selectedFile
+      });
       
       const response = await axios.put(
         `http://localhost:5000/api/quality/${customerId}/Blue`,
@@ -130,6 +154,16 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
           </select>
         </div>
         
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-300">Inspection Date</label>
+          <input
+            type="date"
+            value={inspectionDate}
+            onChange={(e) => setInspectionDate(e.target.value)}
+            className="w-full p-2 bg-zinc-800 border border-gray-600 rounded-md text-white"
+          />
+        </div>
+        
         {qualityStatus === "Rejected" && (
           <>
             <div className="space-y-2">
@@ -140,6 +174,7 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
                 className="w-full p-2 bg-zinc-800 border border-gray-600 rounded-md text-white"
               >
                 <option value="">Select reason</option>
+                <option value="CLOTH NOT GOOD">CLOTH NOT GOOD</option>
                 <option value="Stitch Pull">Stitch Pull</option>
                 <option value="Color Fade">Color Fade</option>
                 <option value="Tear">Tear</option>
@@ -155,15 +190,9 @@ const BlueQualityCheck: React.FC<BlueQualityCheckProps> = ({ customerId = '' }) 
                   type="file"
                   accept="image/*"
                   onChange={handleFileChange}
-                  className="hidden"
+                  className="w-full text-white"
                   id="file-upload"
                 />
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-md"
-                >
-                  Click to upload or drag and drop
-                </label>
                 <p className="mt-2 text-sm text-gray-400">PNG, JPG or GIF (max. 5MB)</p>
                 
                 {previewUrl && (

@@ -26,8 +26,8 @@ interface DataContextType {
   customers: string[];
   loading: boolean;
   error: string | null;
-  fetchItemsByCustomerId: (customerId: string) => void;
-  updateItem: (item: ProductItem) => void;
+  fetchItemsByCustomerId: (customerId: string) => Promise<void>;
+  updateItem: (item: ProductItem) => Promise<void>;
 }
 
 // Create the context with a default value
@@ -36,15 +36,15 @@ const DataContext = createContext<DataContextType>({
   customers: [],
   loading: false,
   error: null,
-  fetchItemsByCustomerId: () => {},
-  updateItem: () => {},
+  fetchItemsByCustomerId: async () => {},
+  updateItem: async () => {},
 });
 
 // Custom hook for using the data context
 export const useData = () => useContext(DataContext);
 
 // Base API URL - configure this based on your environment
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "http://localhost:5000/api";
 
 interface DataProviderProps {
   children: ReactNode;
@@ -60,11 +60,13 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        // Get all unique customers from the orders endpoint
-        const response = await axios.get(`${API_BASE_URL}/api/orders/customers`);
+        console.log("Fetching customers from:", `${API_BASE_URL}/orders/customers`);
+        const response = await axios.get(`${API_BASE_URL}/orders/customers`);
+        
+        console.log("Customers response:", response.data);
         
         // Extract customer IDs from the response
-        const customerIds = response.data.map((customer: any) => customer.customerId);
+        const customerIds = response.data.map((customer: any) => customer.customerId || customer._id);
         
         setCustomers(customerIds || []);
       } catch (err) {
@@ -77,64 +79,78 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   }, []);
 
   // Fetch items by customer ID
-  const fetchItemsByCustomerId = async (customerId: string) => {
+  const fetchItemsByCustomerId = async (customerId: string): Promise<void> => {
     setLoading(true);
     setError(null);
     
     try {
       console.log(`Fetching data for customer ID: ${customerId}`);
       
-      // FIX: Try/catch each API call separately to avoid failing the entire Promise.all
+      // Fetch orders data (primary data source)
       let ordersData = [];
+      try {
+        console.log("Fetching orders from:", `${API_BASE_URL}/orders/customer/${customerId}`);
+        const ordersResponse = await axios.get(`${API_BASE_URL}/orders/customer/${customerId}`);
+        ordersData = ordersResponse.data || [];
+        console.log("Orders data:", ordersData);
+      } catch (err: any) {
+        console.error("Error fetching orders:", err);
+        if (err.response?.status === 404) {
+          setError(`No orders found for customer ID: ${customerId}`);
+          return;
+        }
+        throw err;
+      }
+
+      if (ordersData.length === 0) {
+        setError(`No orders found for customer ID: ${customerId}`);
+        return;
+      }
+      
+      // Fetch additional status data
       let cuttingData = [];
       let stitchingData = [];
       let qualityData = [];
       
       try {
-        const ordersResponse = await axios.get(`${API_BASE_URL}/api/orders/customer/${customerId}`);
-        ordersData = ordersResponse.data || [];
-      } catch (err) {
-        console.error("Error fetching orders:", err);
-      }
-      
-      try {
-        const cuttingResponse = await axios.get(`${API_BASE_URL}/api/cutting/customer/${customerId}`);
+        console.log("Fetching cutting data from:", `${API_BASE_URL}/cutting/customer/${customerId}`);
+        const cuttingResponse = await axios.get(`${API_BASE_URL}/cutting/customer/${customerId}`);
         cuttingData = cuttingResponse.data || [];
+        console.log("Cutting data:", cuttingData);
       } catch (err) {
-        console.error("Error fetching cutting data:", err);
+        console.warn("Error fetching cutting data:", err);
       }
       
       try {
-        const stitchingResponse = await axios.get(`${API_BASE_URL}/api/stitching/customer/${customerId}`);
+        console.log("Fetching stitching data from:", `${API_BASE_URL}/stitching/customer/${customerId}`);
+        const stitchingResponse = await axios.get(`${API_BASE_URL}/stitching/customer/${customerId}`);
         stitchingData = stitchingResponse.data || [];
+        console.log("Stitching data:", stitchingData);
       } catch (err) {
-        console.error("Error fetching stitching data:", err);
+        console.warn("Error fetching stitching data:", err);
       }
       
       try {
-        const qualityResponse = await axios.get(`${API_BASE_URL}/api/quality/customer/${customerId}`);
+        console.log("Fetching quality data from:", `${API_BASE_URL}/quality/customer/${customerId}`);
+        const qualityResponse = await axios.get(`${API_BASE_URL}/quality/customer/${customerId}`);
         qualityData = qualityResponse.data || [];
+        console.log("Quality data:", qualityData);
       } catch (err) {
-        console.error("Error fetching quality data:", err);
+        console.warn("Error fetching quality data:", err);
       }
 
-      // Process order data as the base
-      if (ordersData.length === 0) {
-        setError("No orders found for this customer ID.");
-        setLoading(false);
-        return;
-      }
-      
-      // Map additional data from other collections
+      // Process and combine all data
       const processedItems = ordersData.map((order: any) => {
+        console.log("Processing order:", order);
+        
         // Find matching cutting data
         const cuttingItem = cuttingData.find((item: any) => 
-          item.orderId === order._id.toString()
+          item.orderId === order._id?.toString() || item.orderId === order._id
         ) || {};
         
         // Find matching stitching data
         const stitchingItem = stitchingData.find((item: any) => 
-          item.orderId === order._id.toString()
+          item.orderId === order._id?.toString() || item.orderId === order._id
         ) || {};
         
         // Find matching quality data based on color
@@ -143,8 +159,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         ) || {};
         
         // Combine all data into a single item
-        return {
-          id: order._id || "",
+        const processedItem = {
+          id: order._id?.toString() || order.id || "",
           customerId: order.customerId || "",
           itemName: order.itemName || "",
           size: order.size || "",
@@ -153,91 +169,133 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           clothType: order.clothType || qualityItem.clothType || "",
           cuttingStatus: cuttingItem.status || order.cuttingStatus || "Not Started",
           stitchingStatus: stitchingItem.status || order.stitchingStatus || "Not Started",
-          qualityStatus: qualityItem.qualityStatus || "",
+          qualityStatus: qualityItem.qualityStatus || qualityItem.status || "Not Started",
           supervisor: cuttingItem.supervisor || qualityItem.supervisor || "",
           tailor: stitchingItem.tailor || "",
           rejectedReason: qualityItem.rejectedReason || "",
-          imageUrl: qualityItem.photoUrl || "",
+          imageUrl: qualityItem.photoUrl || qualityItem.imageUrl || "",
           date: order.date || qualityItem.date || new Date().toISOString().split('T')[0],
         };
+        
+        console.log("Processed item:", processedItem);
+        return processedItem;
       });
       
+      console.log("Final processed items:", processedItems);
       setItems(processedItems);
+      
     } catch (err: any) {
       console.error("Error fetching data:", err);
-      setError(err.message || "Failed to fetch data. Please try again later.");
+      
+      // Provide more specific error messages
+      if (err.response?.status === 404) {
+        setError(`Customer ID "${customerId}" not found. Please check the customer ID and try again.`);
+      } else if (err.response?.status === 500) {
+        setError("Server error occurred. Please try again later.");
+      } else if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK') {
+        setError("Cannot connect to server. Please check if the backend server is running.");
+      } else {
+        setError(err.message || "Failed to fetch data. Please try again later.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   // Update an item
-  const updateItem = async (updatedItem: ProductItem) => {
+  const updateItem = async (updatedItem: ProductItem): Promise<void> => {
     try {
-      // For quality updates, we need to update by color
-      if (updatedItem.qualityStatus) {
-        // Create form data for file uploads if needed
-        const formData = new FormData();
-        formData.append('qualityStatus', updatedItem.qualityStatus);
-        
-        if (updatedItem.rejectedReason) {
-          formData.append('rejectedReason', updatedItem.rejectedReason);
+      console.log("Updating item:", updatedItem);
+      
+      // Handle different types of updates based on what changed
+      
+      // For cutting status updates
+      if (updatedItem.cuttingStatus && updatedItem.cuttingStatus !== "Not Started") {
+        try {
+          const response = await axios.put(`${API_BASE_URL}/cutting/${updatedItem.id}`, {
+            status: updatedItem.cuttingStatus,
+            supervisor: updatedItem.supervisor
+          });
+          console.log("Cutting update response:", response.data);
+        } catch (err) {
+          console.error("Error updating cutting status:", err);
         }
-        
-        if (updatedItem.supervisor) {
-          formData.append('supervisor', updatedItem.supervisor);
+      }
+      
+      // For stitching status updates
+      if (updatedItem.stitchingStatus && updatedItem.stitchingStatus !== "Not Started") {
+        try {
+          const response = await axios.put(`${API_BASE_URL}/stitching/${updatedItem.id}`, {
+            status: updatedItem.stitchingStatus,
+            tailor: updatedItem.tailor
+          });
+          console.log("Stitching update response:", response.data);
+        } catch (err) {
+          console.error("Error updating stitching status:", err);
         }
-        
-        if (updatedItem.clothType) {
-          formData.append('clothType', updatedItem.clothType);
-        }
-        
-        // Convert imageUrl to File object if needed
-        // Note: This only works if imageUrl is a Blob URL from this session
-        // For existing URLs, we'd need to keep the URL as is
-        if (updatedItem.imageUrl && updatedItem.imageUrl.startsWith('blob:')) {
-          try {
-            const response = await fetch(updatedItem.imageUrl);
-            const blob = await response.blob();
-            const file = new File([blob], 'quality-image.jpg', { type: 'image/jpeg' });
-            formData.append('photo', file);
-          } catch (err) {
-            console.error("Error processing image:", err);
+      }
+      
+      // For quality updates
+      if (updatedItem.qualityStatus && updatedItem.qualityStatus !== "Not Started") {
+        try {
+          // Create form data for file uploads if needed
+          const formData = new FormData();
+          formData.append('qualityStatus', updatedItem.qualityStatus);
+          
+          if (updatedItem.rejectedReason) {
+            formData.append('rejectedReason', updatedItem.rejectedReason);
           }
-        }
-        
-        // Make the API call
-        const response = await axios.put(
-          `${API_BASE_URL}/api/quality/${updatedItem.customerId}/${updatedItem.color}`, 
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data'
+          
+          if (updatedItem.supervisor) {
+            formData.append('supervisor', updatedItem.supervisor);
+          }
+          
+          if (updatedItem.clothType) {
+            formData.append('clothType', updatedItem.clothType);
+          }
+          
+          // Handle image upload if there's a new image
+          if (updatedItem.imageUrl && updatedItem.imageUrl.startsWith('blob:')) {
+            try {
+              const response = await fetch(updatedItem.imageUrl);
+              const blob = await response.blob();
+              const file = new File([blob], 'quality-image.jpg', { type: 'image/jpeg' });
+              formData.append('photo', file);
+            } catch (err) {
+              console.error("Error processing image:", err);
             }
           }
-        );
-        
-        console.log("Quality update response:", response.data);
-        
-        // Update local state for all items with this color
-        const updatedItems = items.map(item => {
-          if (item.color === updatedItem.color) {
-            return {
-              ...item,
-              qualityStatus: updatedItem.qualityStatus,
-              rejectedReason: updatedItem.rejectedReason || item.rejectedReason,
-              supervisor: updatedItem.supervisor || item.supervisor,
-              imageUrl: updatedItem.imageUrl || item.imageUrl
-            };
-          }
-          return item;
-        });
-        
-        setItems(updatedItems);
+          
+          // Make the API call
+          const response = await axios.put(
+            `${API_BASE_URL}/quality/${updatedItem.customerId}/${updatedItem.color}`, 
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data'
+              }
+            }
+          );
+          
+          console.log("Quality update response:", response.data);
+        } catch (err) {
+          console.error("Error updating quality status:", err);
+        }
       }
+      
+      // Update local state
+      const updatedItems = items.map(item => {
+        if (item.id === updatedItem.id) {
+          return { ...item, ...updatedItem };
+        }
+        return item;
+      });
+      
+      setItems(updatedItems);
+      
     } catch (err) {
       console.error("Error updating item:", err);
-      // Handle errors, possibly show a toast
+      throw err; // Re-throw so the component can handle it
     }
   };
 

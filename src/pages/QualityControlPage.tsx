@@ -22,6 +22,7 @@ const QualityControl = () => {
   const [uniqueColorGroups, setUniqueColorGroups] = useState<ColorGroup[]>([]);
   const { toast } = useToast();
 
+  // ✅ Group items by unique colors safely
   useEffect(() => {
     if (!Array.isArray(items)) return;
 
@@ -83,13 +84,12 @@ const QualityControl = () => {
       const itemsToUpdate = items.filter(item => item.color === colorToUpdate);
 
       itemsToUpdate.forEach(item => {
-        const updatedItem: ProductItem = {
+        const updatedItem = {
           ...item,
-          qualityStatus: formData.qualityStatus!,
+          qualityStatus: formData.qualityStatus,
           rejectedReason: formData.rejectedReason,
-          supervisor: formData.supervisor!,
+          supervisor: formData.supervisor,
           imageUrl: formData.imageUrl,
-          date: item.date ?? new Date().toISOString().split("T")[0], // Preserve or assign date
         };
         updateItem(updatedItem);
       });

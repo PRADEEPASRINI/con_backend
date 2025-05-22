@@ -1,15 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useData, ProductItem } from "@/context/DataContext";
 import DataTable, { Column } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/use-toast";
 import { Check, Save } from "lucide-react";
+import axios from "axios";
 
-// Placeholder for analytics tracking
+// Analytics tracking helper
 const trackAnalytics = (event: string, data: object) => {
   console.log(`Analytics Event: ${event}`, data);
+  
+  // Log to console for debugging
+  console.log({
+    event,
+    customerId: data.customerId || '',
+    timestamp: new Date().toISOString()
+  });
 };
 
-// Add the missing formatDateForInput function
+// Format date for input fields
 const formatDateForInput = (dateString: string | undefined) => {
   if (!dateString) return "";
   
@@ -27,12 +35,13 @@ const formatDateForInput = (dateString: string | undefined) => {
 };
 
 const StitchingProcess = () => {
-  const { items, loading, updateItem, fetchItemsByCustomerId } = useData();
+  const { items, loading, error, fetchItemsByCustomerId } = useData();
   const [searchId, setSearchId] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<ProductItem>>({});
   const [saving, setSaving] = useState(false);
+  const [dataFound, setDataFound] = useState(true);
   const { toast } = useToast();
 
   const handleSearch = () => {
@@ -40,10 +49,30 @@ const StitchingProcess = () => {
       setSelectedCustomerId(searchId.trim());
       fetchItemsByCustomerId(searchId.trim());
       setEditingId(null);
+      
       // Track search event
-      trackAnalytics('Search Initiated', { customerId: searchId.trim() });
+      trackAnalytics('Search Initiated', { 
+        customerId: searchId.trim(),
+        page: 'StitchingProcess'
+      });
     }
   };
+
+  // Handle searching with Enter key
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Update state when items change
+  useEffect(() => {
+    if (items && items.length === 0 && !loading && selectedCustomerId) {
+      setDataFound(false);
+    } else {
+      setDataFound(true);
+    }
+  }, [items, loading, selectedCustomerId]);
 
   const handleEdit = (item: ProductItem) => {
     if (item.cuttingStatus !== "Done") {
@@ -61,8 +90,13 @@ const StitchingProcess = () => {
       tailor: item.tailor || "",
       date: formatDateForInput(item.date),
     });
+    
     // Track edit initiation event
-    trackAnalytics('Edit Initiated', { itemId: item.id, itemName: item.itemName });
+    trackAnalytics('Edit Initiated', { 
+      itemId: item.id, 
+      itemName: item.itemName,
+      customerId: item.customerId
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -70,19 +104,27 @@ const StitchingProcess = () => {
     setEditForm({ ...editForm, [name]: value });
   };
 
-  const handleSave = (item: ProductItem) => {
+  const handleSave = async (item: ProductItem) => {
     setSaving(true);
 
-    setTimeout(() => {
+    try {
       const updatedItem = {
         ...item,
         ...editForm,
       };
 
-      updateItem(updatedItem);
-      setEditingId(null);
-      setSaving(false);
+      // Call the backend API directly
+      await axios.put(`http://localhost:5000/api/stitching/${item.id}`, {
+        status: editForm.stitchingStatus,
+        tailor: editForm.tailor,
+        date: editForm.date
+      });
 
+      // Refresh the data to see the updated values
+      await fetchItemsByCustomerId(item.customerId);
+      
+      setEditingId(null);
+      
       toast({
         title: "Stitching process updated",
         description: `${item.itemName} has been updated to ${editForm.stitchingStatus}.`,
@@ -94,8 +136,18 @@ const StitchingProcess = () => {
         itemName: item.itemName,
         stitchingStatus: editForm.stitchingStatus,
         tailor: editForm.tailor,
+        customerId: item.customerId
       });
-    }, 600);
+    } catch (error) {
+      console.error("Error updating stitching status:", error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating the stitching status.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -108,9 +160,9 @@ const StitchingProcess = () => {
     }
   };
 
-  // Safely filter items - check if items exists and is an array before filtering
+  // Filter items to show only those where cutting is either done or in progress
   const filteredItems = items && Array.isArray(items) 
-    ? items.filter(item => item.cuttingStatus === "Done") 
+    ? items.filter(item => item.cuttingStatus === "Done" || item.stitchingStatus !== "Not Started") 
     : [];
 
   const columns: Column<ProductItem>[] = [
@@ -130,6 +182,7 @@ const StitchingProcess = () => {
               autoFocus
             >
               <option value="">Select Tailor</option>
+              <option value="Robert Lee">Robert Lee</option>
               <option value="Ravi">Ravi</option>
               <option value="Anjali">Anjali</option>
               <option value="Krish">Krish</option>
@@ -161,8 +214,8 @@ const StitchingProcess = () => {
           );
         }
         return (
-          <span className={`status-badge ${item.stitchingStatus.toLowerCase().replace(' ', '-')}`}>
-            {item.stitchingStatus}
+          <span className={`status-badge ${item.stitchingStatus?.toLowerCase().replace(' ', '-') || 'not-started'}`}>
+            {item.stitchingStatus || "Not Started"}
           </span>
         );
       },
@@ -171,8 +224,8 @@ const StitchingProcess = () => {
     {
       header: "Cutting Status",
       accessor: (item) => (
-        <span className={`status-badge ${item.cuttingStatus.toLowerCase().replace(' ', '-')}`}>
-          {item.cuttingStatus}
+        <span className={`status-badge ${item.cuttingStatus?.toLowerCase().replace(' ', '-') || 'not-started'}`}>
+          {item.cuttingStatus || "Not Started"}
         </span>
       ),
       width: "150px",
@@ -246,15 +299,16 @@ const StitchingProcess = () => {
   ];
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8 bg-gray-900"> {/* Removed text-white, added dark background */}
-      <h1 className="mb-8 text-3xl font-bold text-white">Stitching Process</h1> {/* Title explicitly white */}
+    <div className="container mx-auto max-w-6xl px-4 py-8 bg-gray-900">
+      <h1 className="mb-8 text-3xl font-bold text-white">Stitching Process</h1>
 
       <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-center">
         <input
           type="text"
-          placeholder="Enter Customer ID (e.g., SFD12345)"
+          placeholder="Enter Customer ID (e.g., CUST001)"
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="w-full rounded-md border border-textile-300 px-3 py-2 text-black md:w-1/3"
         />
         <button
@@ -265,6 +319,24 @@ const StitchingProcess = () => {
         </button>
       </div>
 
+      {/* Error message */}
+      {error && (
+        <div className="mb-4 rounded-md bg-red-100 p-4 text-red-800">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* No data message */}
+      {!loading && selectedCustomerId && filteredItems.length === 0 && (
+        <div className="mb-4 rounded-md bg-yellow-100 p-4 text-yellow-800">
+          <p>
+            {dataFound
+              ? "No stitching data found for this customer. Please check the customer ID or ensure that items have completed the cutting process."
+              : "No orders found for this customer ID."}
+          </p>
+        </div>
+      )}
+
       {/* Apply text-white to the DataTable container */}
       <div className="text-white">
         <DataTable
@@ -273,15 +345,16 @@ const StitchingProcess = () => {
           keyExtractor={(item) => item.id}
           onRowClick={handleRowClick}
           isLoading={loading}
+          emptyMessage={selectedCustomerId ? "No matching records found" : "Search for a customer ID to see records"}
         />
       </div>
 
       {selectedCustomerId && filteredItems.length > 0 && (
         <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="rounded-md bg-white p-4 shadow-md text-gray-800"> {/* Added text color */}
+          <div className="rounded-md bg-white p-4 shadow-md text-gray-800">
             <h3 className="mb-2 text-lg font-medium text-textile-800">Tailor Assignments</h3>
             <ul className="space-y-2 text-sm">
-              {["Ravi", "Anjali", "Krish", "Devi", "Amaan", "Nisha"].map(tailor => {
+              {["Robert Lee", "Ravi", "Anjali", "Krish", "Devi", "Amaan", "Nisha"].map(tailor => {
                 const count = filteredItems.filter(item => item.tailor === tailor).length;
                 return (
                   <li key={tailor} className="flex items-center justify-between">
@@ -295,7 +368,7 @@ const StitchingProcess = () => {
             </ul>
           </div>
 
-          <div className="rounded-md bg-white p-4 shadow-md text-gray-800"> {/* Added text color */}
+          <div className="rounded-md bg-white p-4 shadow-md text-gray-800">
             <h3 className="mb-2 text-lg font-medium text-textile-800">Progress Summary</h3>
             <div className="space-y-3">
               {["Not Started", "In Progress", "Done"].map(status => {
@@ -324,13 +397,14 @@ const StitchingProcess = () => {
             </div>
           </div>
 
-          <div className="rounded-md bg-white p-4 shadow-md text-gray-800"> {/* Added text color */}
+          <div className="rounded-md bg-white p-4 shadow-md text-gray-800">
             <h3 className="mb-2 text-lg font-medium text-textile-800">Instructions</h3>
             <ul className="ml-5 list-disc text-sm text-textile-700">
               <li>Search Customer ID to view items</li>
               <li>Click any row to assign tailor and update stitching</li>
-              <li>Only items with "Done" cutting status are shown</li>
-              <li>Items with "Done" stitching go to Quality Check</li>
+              <li>Only items with "Done" cutting status can be edited</li>
+              <li>Items with "Done" stitching move to Quality Check</li>
+              <li>Press ESC to cancel editing</li>
             </ul>
           </div>
         </div>
