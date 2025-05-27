@@ -36,22 +36,41 @@ const AnalyticsDashboard = () => {
     const totalOrders = items.length;
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     
-    // Status counts
-    const cuttingComplete = items.filter(item => 
-      item.cuttingStatus === "Completed" || item.cuttingStatus === "Complete"
-    ).length;
+    // Status counts - check for specific status fields first, then fall back to general status
+    const cuttingComplete = items.filter(item => {
+      // Check if there's a specific cutting status field
+      if (item.cuttingStatus) {
+        return item.cuttingStatus === "Completed" || item.cuttingStatus === "Complete";
+      }
+      // If no specific field, assume completed items have cutting done
+      return item.status === "Done" || item.status === "Completed";
+    }).length;
     
-    const stitchingComplete = items.filter(item => 
-      item.stitchingStatus === "Completed" || item.stitchingStatus === "Complete"
-    ).length;
+    const stitchingComplete = items.filter(item => {
+      // Check if there's a specific stitching status field
+      if (item.stitchingStatus) {
+        return item.stitchingStatus === "Completed" || item.stitchingStatus === "Complete";
+      }
+      // If no specific field, assume completed items have stitching done
+      return item.status === "Done" || item.status === "Completed";
+    }).length;
     
-    const qualityPassed = items.filter(item => 
-      item.qualityStatus === "Passed" || item.qualityStatus === "Approved"
-    ).length;
+    const qualityPassed = items.filter(item => {
+      // Check if there's a specific quality status field
+      if (item.qualityStatus) {
+        return item.qualityStatus === "Passed" || item.qualityStatus === "Approved";
+      }
+      // If no specific field, assume completed items passed quality
+      return item.status === "Done" || item.status === "Completed";
+    }).length;
     
-    const qualityRejected = items.filter(item => 
-      item.qualityStatus === "Rejected" || item.qualityStatus === "Failed"
-    ).length;
+    const qualityRejected = items.filter(item => {
+      if (item.qualityStatus) {
+        return item.qualityStatus === "Rejected" || item.qualityStatus === "Failed";
+      }
+      // If no specific field, assume no rejections for now
+      return false;
+    }).length;
 
     // Progress percentages
     const cuttingProgress = totalOrders > 0 ? Math.round((cuttingComplete / totalOrders) * 100) : 0;
@@ -71,11 +90,13 @@ const AnalyticsDashboard = () => {
     };
   }, [items]);
 
-  const getStatusBadge = (status: string, type: 'cutting' | 'stitching' | 'quality') => {
-    const normalizedStatus = status?.toLowerCase() || '';
+  const getStatusBadge = (status: string, type: 'cutting' | 'stitching' | 'quality', generalStatus?: string) => {
+    // If no specific status provided, use general status
+    const statusToCheck = status || generalStatus || '';
+    const normalizedStatus = statusToCheck.toLowerCase();
     
     if (type === 'quality') {
-      if (normalizedStatus === 'passed' || normalizedStatus === 'approved') {
+      if (normalizedStatus === 'passed' || normalizedStatus === 'approved' || normalizedStatus === 'done') {
         return <Badge className="bg-green-500 text-white">Passed</Badge>;
       } else if (normalizedStatus === 'rejected' || normalizedStatus === 'failed') {
         return <Badge variant="destructive">Rejected</Badge>;
@@ -85,7 +106,7 @@ const AnalyticsDashboard = () => {
       return <Badge variant="outline">Not Started</Badge>;
     }
     
-    if (normalizedStatus === 'completed' || normalizedStatus === 'complete') {
+    if (normalizedStatus === 'completed' || normalizedStatus === 'complete' || normalizedStatus === 'done') {
       return <Badge className="bg-green-500 text-white">Completed</Badge>;
     } else if (normalizedStatus === 'in progress' || normalizedStatus === 'pending') {
       return <Badge variant="secondary">In Progress</Badge>;
@@ -315,9 +336,9 @@ const AnalyticsDashboard = () => {
                         <td className="p-2">{item.size}</td>
                         <td className="p-2">{item.color}</td>
                         <td className="p-2">{item.quantity}</td>
-                        <td className="p-2">{getStatusBadge(item.cuttingStatus, 'cutting')}</td>
-                        <td className="p-2">{getStatusBadge(item.stitchingStatus, 'stitching')}</td>
-                        <td className="p-2">{getStatusBadge(item.qualityStatus, 'quality')}</td>
+                        <td className="p-2">{getStatusBadge(item.cuttingStatus, 'cutting', item.status)}</td>
+                        <td className="p-2">{getStatusBadge(item.stitchingStatus, 'stitching', item.status)}</td>
+                        <td className="p-2">{getStatusBadge(item.qualityStatus, 'quality', item.status)}</td>
                       </tr>
                     ))}
                   </tbody>

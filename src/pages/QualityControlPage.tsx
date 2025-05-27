@@ -22,7 +22,7 @@ const QualityControl = () => {
   const [uniqueColorGroups, setUniqueColorGroups] = useState<ColorGroup[]>([]);
   const { toast } = useToast();
 
-  // Group items by unique colors
+  // ✅ Group items by unique colors safely
   useEffect(() => {
     if (!Array.isArray(items)) return;
 
@@ -45,8 +45,10 @@ const QualityControl = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchItemsByCustomerId(searchId.trim());
-    setSelectedItem(null);
+    if (searchId.trim()) {
+      fetchItemsByCustomerId(searchId.trim());
+      setSelectedItem(null);
+    }
   };
 
   const handleRowClick = (colorGroup: ColorGroup) => {
@@ -59,7 +61,6 @@ const QualityControl = () => {
       rejectedReason: representativeItem.rejectedReason,
       supervisor: representativeItem.supervisor || "",
       imageUrl: representativeItem.imageUrl,
-      date: representativeItem.date,
     });
   };
 
@@ -89,7 +90,6 @@ const QualityControl = () => {
           rejectedReason: formData.rejectedReason,
           supervisor: formData.supervisor,
           imageUrl: formData.imageUrl,
-          date: formData.date || new Date().toISOString(),
         };
         updateItem(updatedItem);
       });
@@ -160,15 +160,17 @@ const QualityControl = () => {
       accessor: (group) => group.items[0].supervisor || "Not Assigned",
       width: "120px",
     },
-    {
-      header: "Date",
-      accessor: (group) => {
-        const date = group.items[0].date;
-        if (!date) return "N/A";
-        return new Date(date).toISOString().split('T')[0];
-      },
-      width: "110px",
-    },
+ // Update the date column in the columns array
+{
+  header: "Date",
+  accessor: (group) => {
+    const date = group.items[0].date;
+    if (!date) return "N/A";
+    // Format the date to show only YYYY-MM-DD
+    return new Date(date).toISOString().split('T')[0];
+  },
+  width: "110px",
+},
   ];
 
   return (
@@ -178,7 +180,7 @@ const QualityControl = () => {
       <form onSubmit={handleSearch} className="mb-6 flex gap-2">
         <input
           type="text"
-          placeholder="Enter Customer ID (leave blank for all)"
+          placeholder="Enter Customer ID (e.g., SFD12345)"
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
           className="flex-1 rounded-md border border-gray-600 bg-zinc-800 px-3 py-2 text-white"
@@ -264,18 +266,6 @@ const QualityControl = () => {
                   className="w-full rounded-md border border-gray-600 bg-zinc-800 px-3 py-2 text-white"
                 />
               </div>
-
-              {formData.date && (
-                <div className="mb-4">
-                  <label className="mb-1 block text-sm font-medium">Date</label>
-                  <input
-                    type="text"
-                    value={new Date(formData.date).toISOString().split('T')[0]}
-                    readOnly
-                    className="w-full rounded-md border border-gray-600 bg-zinc-800 px-3 py-2 text-white"
-                  />
-                </div>
-              )}
 
               <button
                 type="submit"

@@ -34,20 +34,6 @@ const formatDateForInput = (dateString: string | undefined) => {
   }
 };
 
-// Format date for display
-const formatDateForDisplay = (dateString: string | undefined) => {
-  if (!dateString) return new Date().toLocaleDateString();
-  
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return new Date().toLocaleDateString();
-    return date.toLocaleDateString();
-  } catch (error) {
-    console.error("Error formatting date for display:", error);
-    return new Date().toLocaleDateString();
-  }
-};
-
 const StitchingProcess = () => {
   const { items, loading, error, fetchItemsByCustomerId } = useData();
   const [searchId, setSearchId] = useState("");
@@ -157,18 +143,14 @@ const StitchingProcess = () => {
 
       console.log('Update response:', response.data);
 
-      // Add a small delay before refreshing to ensure database consistency
-      await new Promise(resolve => setTimeout(resolve, 500));
-
       // Refresh the data to see the updated values
       await fetchItemsByCustomerId(item.customerId);
       
       setEditingId(null);
-      setEditForm({});
       
       toast({
         title: "Stitching process updated",
-        description: `${item.itemName} has been updated successfully.`,
+        description: `${item.itemName} has been updated to ${editForm.stitchingStatus}.`,
       });
       
       // Track save event
@@ -201,7 +183,6 @@ const StitchingProcess = () => {
 
   const handleCancel = () => {
     setEditingId(null);
-    setEditForm({});
   };
 
   const handleRowClick = (item: ProductItem) => {
@@ -295,7 +276,7 @@ const StitchingProcess = () => {
             />
           );
         }
-        return formatDateForDisplay(item.date);
+        return item.date || formatDateForInput(item.date);
       }, 
       width: "110px" 
     },
