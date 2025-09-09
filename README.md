@@ -46,3 +46,13 @@ npm install
 # Install dependencies for backend
 cd ../server
 npm install
+
+### Running the Application
+# Start backend
+cd server
+npm run dev
+
+# Start frontend
+cd ../client
+npm run dev
+
